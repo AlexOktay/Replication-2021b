@@ -13,6 +13,10 @@ library(xtable)
 library(corrplot)
 library(plotrix)
 library(STL)
+library(ggpubr)
+library(cowplot)
+library(grid)
+library(ggplotify)
 #library(devtools)
 #devtools::install_github("KevinKotze/tsm") #to installe non-CRAN packages
 
@@ -1008,20 +1012,20 @@ write.csv(results_negative,"C:/Users/alexo/Desktop/Recherche Empirique/2. Projet
 
 # Section 9: Validation-------------------------------------------------------
 
-data_endogenous_cv<-data_endogenous[1:(nrow(data_endogenous)-90),]
-data_exogenous_cv<-data_exogenous[1:(nrow(data_exogenous)-90),]
+data_endogenous_cv<-data_endogenous[1:(nrow(data_endogenous)-70),]
+data_exogenous_cv<-data_exogenous[1:(nrow(data_exogenous)-70),]
 number_lags_cv<-VARselect(data_endogenous)
-VAR_Results_cv<-VAR(data_endogenous_cv, p=5, exogen=data_exogenous_cv)
+VAR_Results_cv<-VAR(data_endogenous_cv, p=7, exogen=data_exogenous_cv)
 
-n_pred<-90
+n_pred<-70
 setwd(wd_predictions)
 exogen_prediction<-data_exogenous_cv[c(1:n_pred),]
 # Actual (02.02.2021): 1500 cases; 75 stringency
 # Real 90 days (02.05.2021): 1300 cases; 52 stringency
 # exogen_prediction[,1]<-seq(1500,1300,by=((1300 - 1500)/(n_pred- 1)) )
 # exogen_prediction[,2]<-seq(75,52,by =((52 - 75)/(n_pred- 1)) )
-exogen_prediction[,1]<-data_exogenous[399:488,1]
-exogen_prediction[,2]<-data_exogenous[399:488,2]
+exogen_prediction[,1]<-data_exogenous[419:488,1]
+exogen_prediction[,2]<-data_exogenous[419:488,2]
 prediction<-predict(VAR_Results_cv, n.ahead = n_pred, ci = 0.9, dumvar = exogen_prediction)
 
 #add back the no2 seasonality
@@ -1046,114 +1050,128 @@ prediction<-predict(VAR_Results_cv, n.ahead = n_pred, ci = 0.9, dumvar = exogen_
 # prediction$endog[,4]<-prediction$endog[,4]+STL_elec$time.series[1:n,1]
 
 #Graph
-png("Prediction_cv_1.png", height =3, width = 4, units = 'in', type="windows", res=400)
-par(mar=c(2.5, 2.5, 2, 1))
-plot(data_endogenous[,1],x=seq(1,nrow(data_endogenous)),type="l",main="Consumption",xaxt="n",ylim=c(1.7E8,3.2E8))
-abline(v=nrow(data_endogenous_cv),col="grey",lty=4)
-x<-seq(399,488)
-y1<-prediction$fcst$consumption[,2]
-y2<-prediction$fcst$consumption[,3]
-polygon(c(x,rev(x)),c(y2,rev(y1)),col="grey",border=NA)
-lines(y=prediction$fcst$consumption[,2],x=seq(399,488),col="blue",lty=2)
-lines(y=prediction$fcst$consumption[,3],x=seq(399,488),col="blue",lty=2)
-lines(y=data_endogenous[399:488,1],x=seq(399,488),col="red")
-legend("bottomright", legend = c("Actual", "Predicted (90% CI)"), lty = c(1,2), 
-       col = c("red", "blue"), bty = "n")
-axis(1, at = c(0,182,365), labels=c("Jan-20","Jul-20","Jan-21"))
+x<-seq(419,488)
+
+p1<-ggplot()+
+  theme_classic() + 
+  ggtitle("Consumption")+
+  geom_line(aes(x=seq(1,nrow(data_endogenous)), y=data_endogenous[,1]))+
+  geom_vline(xintercept=419,color="grey60")+
+  geom_ribbon(aes(x=x, ymax=prediction$fcst$consumption[,3], ymin=prediction$fcst$consumption[,2]), fill="grey", alpha=.7, color="blue", linetype=2)+
+  geom_line(aes(y=data_endogenous[419:488,1],x=seq(419,488)),col="red")+
+  labs(y = "", x = "")+
+  ylim(1.7E8,3.2E8)+
+  scale_x_continuous(labels = c("Jan-20","Apr-20","Jul-20","Oct-20","Jan-21","Apr-21"), breaks = c(0,91,182,273,365,456))+
+  theme(text = element_text(size=14),plot.title = element_text(size=22))
+
+p2<-ggplot()+
+  theme_classic() + 
+  ggtitle("SMI")+
+  geom_line(aes(x=seq(1,nrow(data_endogenous)), y=data_endogenous[,2]))+
+  geom_vline(xintercept=419,color="grey60")+
+  geom_ribbon(aes(x=x, ymax=y2<-prediction$fcst$SMI[,3], ymin=y2<-prediction$fcst$SMI[,2]), fill="grey", alpha=.7, color="blue", linetype=2)+
+  geom_line(aes(y=data_endogenous[419:488,2],x=seq(419,488)),col="red")+
+  labs(y = "", x = "")+
+  ylim(8000,12000)+
+  scale_x_continuous(labels = c("Jan-20","Apr-20","Jul-20","Oct-20","Jan-21","Apr-21"), breaks = c(0,91,182,273,365,456))+
+  theme(text = element_text(size=14),plot.title = element_text(size=22))
+
+p3<-ggplot()+
+  theme_classic() + 
+  ggtitle("Unemployment")+
+  geom_line(aes(x=seq(1,nrow(data_endogenous)), y=data_endogenous[,3]))+
+  geom_vline(xintercept=419,color="grey60")+
+  geom_ribbon(aes(x=x, ymax=y2<-prediction$fcst$unemployment_proxy[,3], ymin=y2<-prediction$fcst$unemployment_proxy[,2]), fill="grey", alpha=.7, color="blue", linetype=2)+
+  geom_line(aes(y=data_endogenous[419:488,3],x=seq(419,488)),col="red")+
+  labs(y = "", x = "")+
+  ylim(140000,220000)+
+  scale_x_continuous(labels = c("Jan-20","Apr-20","Jul-20","Oct-20","Jan-21","Apr-21"), breaks = c(0,91,182,273,365,456))+
+  theme(text = element_text(size=14),plot.title = element_text(size=22))
+
+p4<-ggplot()+
+  theme_classic() + 
+  ggtitle("Electricity")+
+  geom_line(aes(x=seq(1,nrow(data_endogenous)), y=data_endogenous[,4]))+
+  geom_vline(xintercept=419,color="grey60")+
+  geom_ribbon(aes(x=x, ymax=y2<-prediction$fcst$electricity[,3], ymin=y2<-prediction$fcst$electricity[,2]), fill="grey", alpha=.7, color="blue", linetype=2)+
+  geom_line(aes(y=data_endogenous[419:488,4],x=seq(419,488)),col="red")+
+  labs(y = "", x = "")+
+  ylim(80,170)+
+  scale_x_continuous(labels = c("Jan-20","Apr-20","Jul-20","Oct-20","Jan-21","Apr-21"), breaks = c(0,91,182,273,365,456))+
+  theme(text = element_text(size=14),plot.title = element_text(size=22))
+
+p5<-ggplot()+
+  theme_classic() + 
+  ggtitle("Mobility")+
+  geom_line(aes(x=seq(1,nrow(data_endogenous)), y=data_endogenous[,5]))+
+  geom_vline(xintercept=419,color="grey60")+
+  geom_ribbon(aes(x=x, ymax=y2<-prediction$fcst$mobility[,3], ymin=y2<-prediction$fcst$mobility[,2]), fill="grey", alpha=.7, color="blue", linetype=2)+
+  geom_line(aes(y=data_endogenous[419:488,5],x=seq(419,488)),col="red")+
+  labs(y = "", x = "")+
+  ylim(-65,10)+
+  scale_x_continuous(labels = c("Jan-20","Apr-20","Jul-20","Oct-20","Jan-21","Apr-21"), breaks = c(0,91,182,273,365,456))+
+  theme(text = element_text(size=14),plot.title = element_text(size=22))
+
+p6<-ggplot()+
+  theme_classic() + 
+  ggtitle("Net new firms")+
+  geom_line(aes(x=seq(1,nrow(data_endogenous)), y=data_endogenous[,6]))+
+  geom_vline(xintercept=419,color="grey60")+
+  geom_ribbon(aes(x=x, ymax=y2<-prediction$fcst$net_bankruptcies[,3], ymin=y2<-prediction$fcst$net_bankruptcies[,2]), fill="grey", alpha=.7, color="blue", linetype=2)+
+  geom_line(aes(y=data_endogenous[419:488,6],x=seq(419,488)),col="red")+
+  labs(y = "", x = "")+
+  ylim(50,260)+
+  scale_x_continuous(labels = c("Jan-20","Apr-20","Jul-20","Oct-20","Jan-21","Apr-21"), breaks = c(0,91,182,273,365,456))+
+  theme(text = element_text(size=14),plot.title = element_text(size=22))
+
+p7<-ggplot()+
+  theme_classic() + 
+  ggtitle("Air pollution")+
+  geom_line(aes(x=seq(1,nrow(data_endogenous)), y=data_endogenous[,7]))+
+  geom_vline(xintercept=419,color="grey60")+
+  geom_ribbon(aes(x=x, ymax=y2<-prediction$fcst$air_pollution[,3], ymin=y2<-prediction$fcst$air_pollution[,2]), fill="grey", alpha=.7, color="blue", linetype=2)+
+  geom_line(aes(y=data_endogenous[419:488,7],x=seq(419,488)),col="red")+
+  labs(y = "", x = "")+
+  ylim(10,45)+
+  scale_x_continuous(labels = c("Jan-20","Apr-20","Jul-20","Oct-20","Jan-21","Apr-21"), breaks = c(0,91,182,273,365,456))+
+  theme(text = element_text(size=14),plot.title = element_text(size=22))
+
+p8<-ggplot()+ #Legend in P8
+  theme_classic() + 
+  geom_ribbon(aes(x=x, ymax=y2<-prediction$fcst$air_pollution[,3], ymin=y2<-prediction$fcst$air_pollution[,2],fill="Predicted (90% CI)"), alpha=.7, color="blue", linetype=2)+
+  geom_line(aes(y=data_endogenous[419:488,7],x=seq(419,488),col="Actual"))+
+  labs(y = "", x = "")+
+  ylim(10,45)+
+  scale_fill_manual(name = '', values = c("grey","red")) +
+  scale_color_manual(name = '', values = c("red","red"))+
+  theme(legend.title = element_text(size=1),
+        legend.text = element_text(size=14),
+        legend.key.size = unit(1, 'cm'),
+        legend.spacing.x = unit(0.4, 'cm'),
+        legend.background = element_blank(),
+        legend.box.background = element_rect(colour = "black"))
+legend <- cowplot::get_legend(p8)
+p8_leg<-as.ggplot(legend)
+
+
+ptot<-ggarrange(p1,p2,p3,p4,p5,p6,p7,p8_leg, ncol=2, nrow=4)
+pdf("fig1.pdf", width=12.5, height=14)
+ptot
 dev.off()
 
-png("Prediction_cv_2.png", height =3, width =4, units = 'in', type="windows", res=400)
-par(mar=c(2.5, 2.5, 2, 1))
-plot(data_endogenous[,2],x=seq(1,nrow(data_endogenous)),type="l",main="SMI",xaxt="n",ylim=c(8000,12000))
-abline(v=nrow(data_endogenous_cv),col="grey",lty=4)
-x<-seq(399,488)
-y1<-prediction$fcst$SMI[,2]
-y2<-prediction$fcst$SMI[,3]
-polygon(c(x,rev(x)),c(y2,rev(y1)),col="grey",border=NA)
-lines(y=prediction$fcst$SMI[,2],x=seq(399,488),col="blue",lty=2)
-lines(y=prediction$fcst$SMI[,3],x=seq(399,488),col="blue",lty=2)
-lines(y=data_endogenous[399:488,2],x=seq(399,488),col="red")
-legend("bottomright", legend = c("Actual", "Predicted (90% CI)"), lty = c(1,2), 
-       col = c("red", "blue"), bty = "n")
-axis(1, at = c(0,182,365), labels=c("Jan-20","Jul-20","Jan-21"))
-dev.off()
-
-png("Prediction_cv_3.png", height =3, width =4, units = 'in', type="windows", res=400)
-par(mar=c(2.5, 2.5, 2, 1))
-plot(data_endogenous[,3],x=seq(1,nrow(data_endogenous)),type="l",main="Unemployment",xaxt="n",ylim=c(140000,220000))
-abline(v=nrow(data_endogenous_cv),col="grey",lty=4)
-x<-seq(399,488)
-y1<-prediction$fcst$unemployment_proxy[,2]
-y2<-prediction$fcst$unemployment_proxy[,3]
-polygon(c(x,rev(x)),c(y2,rev(y1)),col="grey",border=NA)
-lines(y=prediction$fcst$unemployment_proxy[,2],x=seq(399,488),col="blue",lty=2)
-lines(y=prediction$fcst$unemployment_proxy[,3],x=seq(399,488),col="blue",lty=2)
-lines(y=data_endogenous[399:488,3],x=seq(399,488),col="red")
-legend("bottomright", legend = c("Actual", "Predicted (90% CI)"), lty = c(1,2), 
-       col = c("red", "blue"), bty = "n")
-axis(1, at = c(0,182,365), labels=c("Jan-20","Jul-20","Jan-21"))
-dev.off()
-
-png("Prediction_cv_4.png", height =3, width =4, units = 'in', type="windows", res=400)
-par(mar=c(2.5, 2.5, 2, 1))
-plot(data_endogenous[,4],x=seq(1,nrow(data_endogenous)),type="l",main="Electricity",xaxt="n",ylim=c(80,170))
-abline(v=nrow(data_endogenous_cv),col="grey",lty=4)
-x<-seq(399,488)
-y1<-prediction$fcst$electricity[,2]
-y2<-prediction$fcst$electricity[,3]
-polygon(c(x,rev(x)),c(y2,rev(y1)),col="grey",border=NA)
-lines(y=prediction$fcst$electricity[,2],x=seq(399,488),col="blue",lty=2)
-lines(y=prediction$fcst$electricity[,3],x=seq(399,488),col="blue",lty=2)
-lines(y=data_endogenous[399:488,4],x=seq(399,488),col="red")
-legend("bottomright", legend = c("Actual", "Predicted (90% CI)"), lty = c(1,2), 
-       col = c("red", "blue"), bty = "n")
-axis(1, at = c(0,182,365), labels=c("Jan-20","Jul-20","Jan-21"))
-dev.off()
-
-png("Prediction_cv_5.png", height =3, width =4, units = 'in', type="windows", res=400)
-par(mar=c(2.5, 2.5, 2, 1))
-plot(data_endogenous[,5],x=seq(1,nrow(data_endogenous)),type="l",main="Mobility",xaxt="n",ylim=c(-65,10))
-abline(v=nrow(data_endogenous_cv),col="grey",lty=4)
-x<-seq(399,488)
-y1<-prediction$fcst$mobility[,2]
-y2<-prediction$fcst$mobility[,3]
-polygon(c(x,rev(x)),c(y2,rev(y1)),col="grey",border=NA)
-lines(y=prediction$fcst$mobility[,2],x=seq(399,488),col="blue",lty=2)
-lines(y=prediction$fcst$mobility[,3],x=seq(399,488),col="blue",lty=2)
-lines(y=data_endogenous[399:488,5],x=seq(399,488),col="red")
-legend("bottomright", legend = c("Actual", "Predicted (90% CI)"), lty = c(1,2), 
-       col = c("red", "blue"), bty = "n")
-axis(1, at = c(0,182,365), labels=c("Jan-20","Jul-20","Jan-21"))
-dev.off()
-
-png("Prediction_cv_6.png", height =3, width =4, units = 'in', type="windows", res=400)
-par(mar=c(2.5, 2.5, 2, 1))
-plot(data_endogenous[,6],x=seq(1,nrow(data_endogenous)),type="l",main="New firms",xaxt="n",ylim=c(50,230))
-abline(v=nrow(data_endogenous_cv),col="grey",lty=4)
-x<-seq(399,488)
-y1<-prediction$fcst$net_bankruptcies[,2]
-y2<-prediction$fcst$net_bankruptcies[,3]
-polygon(c(x,rev(x)),c(y2,rev(y1)),col="grey",border=NA)
-lines(y=prediction$fcst$net_bankruptcies[,2],x=seq(399,488),col="blue",lty=2)
-lines(y=prediction$fcst$net_bankruptcies[,3],x=seq(399,488),col="blue",lty=2)
-lines(y=data_endogenous[399:488,6],x=seq(399,488),col="red")
-legend("bottomright", legend = c("Actual", "Predicted (90% CI)"), lty = c(1,2), 
-       col = c("red", "blue"), bty = "n")
-axis(1, at = c(0,182,365), labels=c("Jan-20","Jul-20","Jan-21"))
-dev.off()
-
-png("Prediction_cv_7.png", height=3, width =4, units = 'in', type="windows", res=400)
-par(mar=c(2.5, 2.5, 2, 1))
-plot(data_endogenous[,7],x=seq(1,nrow(data_endogenous)),type="l",main="Air pollution",xaxt="n",ylim=c(10,45))
-abline(v=nrow(data_endogenous_cv),col="grey",lty=4)
-x<-seq(399,488)
-y1<-prediction$fcst$air_pollution[,2]
-y2<-prediction$fcst$air_pollution[,3]
-polygon(c(x,rev(x)),c(y2,rev(y1)),col="grey",border=NA)
-lines(y=prediction$fcst$air_pollution[,2],x=seq(399,488),col="blue",lty=2)
-lines(y=prediction$fcst$air_pollution[,3],x=seq(399,488),col="blue",lty=2)
-lines(y=data_endogenous[399:488,7],x=seq(399,488),col="red")
-legend("bottomright", legend = c("Actual", "Predicted (90% CI)"), lty = c(1,2), 
-       col = c("red", "blue"), bty = "n")
-axis(1, at = c(0,182,365), labels=c("Jan-20","Jul-20","Jan-21"))
-dev.off()
+#MAE
+mae_df<-data.frame()
+mae_df[1,1]<-"Consumption"
+mae_df[1,2]<-mean(abs(prediction$fcst$consumption[,1] - data_endogenous[419:488,1]))
+mae_df[2,1]<-"SMI"
+mae_df[2,2]<-mean(abs(prediction$fcst$SMI[,1] - data_endogenous[419:488,2]))
+mae_df[3,1]<-"Unemployment"
+mae_df[3,2]<-mean(abs(prediction$fcst$unemployment_proxy[,1] - data_endogenous[419:488,3]))
+mae_df[4,1]<-"Electricity"
+mae_df[4,2]<-mean(abs(prediction$fcst$electricity[,1] - data_endogenous[419:488,4]))
+mae_df[5,1]<-"Mobility"
+mae_df[5,2]<-mean(abs(prediction$fcst$mobility[,1] - data_endogenous[419:488,5]))
+mae_df[6,1]<-"Net new firms"
+mae_df[6,2]<-mean(abs(prediction$fcst$net_bankruptcies[,1] - data_endogenous[419:488,6]))
+mae_df[7,1]<-"Air pollution"
+mae_df[7,2]<-mean(abs(prediction$fcst$air_pollution[,1] - data_endogenous[419:488,7]))
